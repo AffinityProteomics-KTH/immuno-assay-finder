@@ -11,6 +11,10 @@ datesUI <- function(id) {
     
     fluidRow(tags$h3("Summary of included target lists")),
     
+    fluidRow(tags$p("This list summarizes when the respective lists for each 
+                    panel and method were retrieved for the app, and the number 
+                    of targets included in said lists.")),
+    
     # ouput table
     DTOutput(ns("table_dates"))
     
