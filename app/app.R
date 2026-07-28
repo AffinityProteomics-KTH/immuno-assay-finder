@@ -7,7 +7,7 @@
 {
   library(tidyverse) # for tidy handling
   library(shiny) # for basic shiny functions
-  library(bslib) # for advanced bootstraping shiny-functions
+  library(bslib) # for advanced bootstrapping shiny-functions
   library(viridis) # for colors
   library(readxl) # for reading excel read_xlsx()
   library(bsicons) # for icons
@@ -18,6 +18,7 @@
   library(rclipboard) # for copy to clipboard button
   library(patchwork) # for wrap_elements
   library(uniprotREST) # for retrieving from UniProtKB  (not in app, but in separate script, incl here for refs)
+  library(shinyvalidate) # for InputValidator
   
   # Packages used with ::
   # bsicons
