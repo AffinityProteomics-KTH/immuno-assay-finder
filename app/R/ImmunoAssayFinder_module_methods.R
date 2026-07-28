@@ -16,13 +16,20 @@ methodsUI <- function(id, choices) {
         width = 350,
         accordion(
           open = FALSE, # No open accordion's from start
+          
           ## Import ####
           accordion_panel(
             # Text above import
             title = "Import a list:", 
             icon = icon("upload",
                         lib = "glyphicon"),
-            helpText(tags$p("Column 1 = 'UniProt ID', then any additional columns, these will be kept in the export.",
+            helpText(tags$p("Formatting requirements:",
+                            tags$br(),
+                            "First column needs to be named 'UniProt ID' (without '').",
+                            tags$br(),
+                            "Any additional columns can be included, these will be kept in the export.",
+                            tags$br(),
+                            "The file needs to be one of .csv, .txt, .tsv, or .xlsx.",
                             tags$br(),
                             "Press 'Generate' to filter based on imported file.")),
             fileInput(inputId = ns("import"), 
@@ -40,22 +47,29 @@ methodsUI <- function(id, choices) {
                                      lib = "glyphicon"),
                          class = "btn-success", 
                          style = "color: #000000; background-color: #43858B; border_color: #43858B; padding:4px; font-size:80%"), 
-          ),
+          ), # end import accordion
           
           ## Search ####
           accordion_panel(
             # Text above text search
-            title = "Gene and/or UniProt ID search:", 
+            title = "Gene name (HGNC) and/or UniProt ID search:", 
             icon = bsicons::bs_icon("search"),
-            helpText("Separate entries with ; or write as a regular expression 
+            helpText("Separate entries with ; (no surrounding spaces) 
+            or write as a regular expression 
                    (not case sensitive)."),
+            helpText("To be specific in your search, preceed the Gene/ID with ^, 
+                     and end it with [$:] (regular expression syntax), e.g. '^MAPT[$:]'."),
+            helpText("If you can't find your target of interest, 
+                     double check under the UniProt IDs-tab that you are using 
+                     the correct Gene name or UniProt ID in your search."),
             helpText("Leave empty to browse all covered genes."),
             # Add box for gene/uniprot search
             textInput(inputId = ns("search_text"), 
                       label = NULL, 
                       value = "")
-          ),
+          ), # end search accordion
           
+          # Filtering menu
           accordion_panel(
             # Text above filtering options
             title = "Filter options:",
@@ -111,10 +125,10 @@ methodsUI <- function(id, choices) {
                                  choices = tmp_choices$quant_choices, 
                                  selected = NULL)
             )
-          ),
+          ), # end filter accordion
+          
+          # Sorting ####          
           accordion_panel(
-            
-            # Sorting ####
             # Text above sorting options
             title = "Sorting options:",
             icon = bsicons::bs_icon("sort-alpha-down"), 
@@ -130,7 +144,8 @@ methodsUI <- function(id, choices) {
                         choices = c("gene", "uniprot_id", "species"), 
                         selected = "gene",
                         multiple = FALSE)
-          )
+          ) # end sorting accordion
+          
         ), # end global accordion
         
         # Buttons/toggle ####
@@ -142,7 +157,7 @@ methodsUI <- function(id, choices) {
                      icon = icon("play",
                                  lib = "glyphicon"),
                      class = "btn-success",
-                     style = "color: #000000; background-color: #A7C947; border_color: #A7C947"), # border #FFFFFF
+                     style = "color: #000000; background-color: #A7C947; border_color: #A7C947"), 
         
         ## Reset ####
         # action button to reset filtering (to not have to untick everything)
@@ -168,12 +183,18 @@ methodsUI <- function(id, choices) {
                      label = "Split technologies into panels",
                      value = FALSE),
         
+        ## Availability switch ####
+        ## switch if only methods with available methods should be shown
+        input_switch(id = ns("excl_empty"), 
+                     label = "Show only methods with available assay",
+                     value = FALSE),
+        
         ## Curation switch ####
         ## switch if curation annotation (coloring) should be included or not
         input_switch(id = ns("incl_curation"), 
                      label = "Include curation annotation",
                      value = TRUE),
-
+        
         ## Dark mode ####
         ## switch for if dark mode should be active or not
         input_dark_mode()
@@ -184,19 +205,26 @@ methodsUI <- function(id, choices) {
       
       fluidRow(
         fluidRow(tags$p("Browse the targets covered by technologies available at 
-                        the Affinity Proteomics unit, SciLifeLab. Please note 
-                        that this summary only includes methods with 
-                        readily and publicly available target lists. 
-                        If your target of interest is not covered below, 
-                        please contact us and we will discuss the possibilities 
-                        of developing an assay."),
+                        the Affinity Proteomics Unit, SciLifeLab. Please note 
+                        that this summary is based on lists from assay providers 
+                        and includes only methods with readily and publicly 
+                        available target information. 
+                        We update these lists regularly (see the tab 'List dates' 
+                        for the current versions); however, the absence of 
+                        an assay for a specific protein does not necessarily 
+                        mean that one has not recently become available from 
+                        one of the providers. If your target of interest is not 
+                        listed, please contact us. We will be happy to verify 
+                        the latest availability with the assay providers and, 
+                        if needed, discuss the possibility of developing 
+                        a new assay ourselves for you."),
                  tags$p("Assays with absolute quantification are marked with an asterisk (*).",
                         tags$br(),
                         "Gene names followed by a colon (:) signifies that a specific form is targeted.")),
-        
+      
         ## Plot area ####
         column(width = 8,
-               (div(style='width:100%;overflow-x: scroll;overflow-y: scroll;',
+               (div(style='width:100%;overflow-x: scroll;overflow-y: scroll;', 
                     uiOutput(ns("heatmap")))) ), 
         
         ## Coverage table ####
@@ -236,7 +264,9 @@ methodsServer <- function(id, df, choices) {
         return(tmp_data_cur)
         
       }) %>% # end reactive curation
-        bindEvent(input$incl_panel, input$incl_curation,
+        bindEvent(input$incl_panel, 
+                  input$excl_empty, 
+                  input$incl_curation,
                   ignoreNULL = FALSE,
                   ignoreInit = FALSE)
       
@@ -250,7 +280,8 @@ methodsServer <- function(id, df, choices) {
         
         if(input$incl_panel){
           tmp_data_panel <- tmp_data %>% 
-            mutate(technique_axis = technique_panel)
+            mutate(technique_axis = technique_panel %>% 
+                     factor())
         } else {
           tmp_data_panel <- tmp_data %>% 
             mutate(technique_axis = technique %>% 
@@ -260,10 +291,12 @@ methodsServer <- function(id, df, choices) {
         return(tmp_data_panel)
         
       }) %>% # end reactive panel
-        bindEvent(input$incl_panel, input$incl_curation,
+        bindEvent(input$incl_panel, 
+                  input$excl_empty,
+                  input$incl_curation,
                   ignoreNULL = FALSE,
                   ignoreInit = FALSE)
-
+      
       # Import file ####
       rv <- reactiveValues(import_table = NULL)
       
@@ -272,7 +305,6 @@ methodsServer <- function(id, df, choices) {
         file_import <- input$import
         ext <- tools::file_ext(file_import$datapath)
         
-        req(file_import)
         validate(need(ext %in% c("csv", "txt", "xlsx", "tsv"), 
                       "Please upload a csv, tsv/txt, or xlsx file."))
         
@@ -284,15 +316,10 @@ methodsServer <- function(id, df, choices) {
             as_tibble()
         }
         
-        req(import_tmp)
-        validate(need(colnames(import_tmp)[1] == "UniProt ID", 
-                      "First column must be named 'UniProt ID', without the ''."))
-        
         rv$import_table <- import_tmp
       })
       
       # Filtering ####
-      # Execute filtering & sorting after pressing generate-button
       df_mod_sub <- reactive({
         
         tmp_data <- df_mod_panel()
@@ -302,9 +329,14 @@ methodsServer <- function(id, df, choices) {
            !is.null(rv$import_table)){
           tmp_data <- df_mod_panel()
           
+          validate(need(colnames(rv$import_table)[1] == "UniProt ID",
+                        "First column must be named 'UniProt ID', without the surrounding ''."))
+          
           tmp_data <- tmp_data %>% 
             filter(uniprot_id %in% (rv$import_table %>% 
                                       pull(`UniProt ID`) %>% 
+                                      unlist() %>% 
+                                      str_split("[;, ]") %>% 
                                       unlist()))
         }
         
@@ -395,7 +427,7 @@ methodsServer <- function(id, df, choices) {
                   input$filter_quant,
                   input$generate,
                   ignoreNULL = FALSE,
-                  ignoreInit = TRUE)
+                  ignoreInit = FALSE)
       
       ## panels ####
       observe({
@@ -415,7 +447,7 @@ methodsServer <- function(id, df, choices) {
                   input$filter_quant,
                   input$generate,
                   ignoreNULL = FALSE,
-                  ignoreInit = TRUE)
+                  ignoreInit = FALSE)
       
       ## techniques ####
       observe({
@@ -435,7 +467,7 @@ methodsServer <- function(id, df, choices) {
                   input$filter_quant,
                   input$generate,
                   ignoreNULL = FALSE,
-                  ignoreInit = TRUE)
+                  ignoreInit = FALSE)
       
       
       ## curation ####
@@ -456,7 +488,7 @@ methodsServer <- function(id, df, choices) {
                   input$filter_quant,
                   input$generate,
                   ignoreNULL = FALSE,
-                  ignoreInit = TRUE)
+                  ignoreInit = FALSE)
       
       ## quantification ####
       observe({
@@ -476,9 +508,9 @@ methodsServer <- function(id, df, choices) {
                   input$filter_cura,
                   input$generate,
                   ignoreNULL = FALSE,
-                  ignoreInit = TRUE)
+                  ignoreInit = FALSE)
       
-
+      
       
       # Reset choices/import ####
       observeEvent(input$undo_import, {
@@ -498,12 +530,30 @@ methodsServer <- function(id, df, choices) {
       # Generate table for plot #### 
       df_plot <- reactive({
         
-        df_mod_sub() %>% 
-          rename("Method" = technique_axis,
-                 "Gene, UniProt ID, Species" = target)
+        if(input$excl_empty){
+          tmp_data <- df_mod_sub() %>% 
+            mutate(technique_axis = factor(technique_axis, 
+                                           levels = unique(technique_axis) %>% 
+                                             sort()),
+                   technique_panel = factor(technique_panel, 
+                                            levels = unique(technique_panel) %>% 
+                                              sort())) %>% 
+            rename("Method" = technique_axis,
+                   "Gene, UniProt ID, Species" = target)
+          
+        } else {
+          tmp_data <- df_mod_sub() %>% 
+            rename("Method" = technique_axis,
+                   "Gene, UniProt ID, Species" = target)
+        }
+        
+        return(tmp_data)
         
       }) %>% # end reactive df_plot
-        bindEvent(input$generate, input$incl_panel, input$incl_curation,
+        bindEvent(input$generate, 
+                  input$incl_panel, 
+                  input$excl_empty, 
+                  input$incl_curation,
                   ignoreNULL = FALSE,
                   ignoreInit = FALSE)
       
@@ -518,7 +568,10 @@ methodsServer <- function(id, df, choices) {
           nrow() 
         
       }) %>% # end reactive nrow
-        bindEvent(input$generate, input$incl_panel, input$incl_curation,
+        bindEvent(input$generate, 
+                  input$incl_panel, 
+                  input$excl_empty, 
+                  input$incl_curation,
                   ignoreNULL = FALSE,
                   ignoreInit = FALSE)
       
@@ -527,13 +580,16 @@ methodsServer <- function(id, df, choices) {
       text_size <- reactive({
         
         n_rows() %>% 
-          {case_when(. < 300 ~ 12, 
+          {case_when(. < 200 ~ 12, 
                      . < 500 ~ 10, 
                      . < 3000 ~ 8, 
                      TRUE ~ 6)} 
         
       }) %>% # end reactive text_size
-        bindEvent(input$generate, input$incl_panel, input$incl_curation,
+        bindEvent(input$generate, 
+                  input$incl_panel, 
+                  input$excl_empty, 
+                  input$incl_curation,
                   ignoreNULL = FALSE,
                   ignoreInit = FALSE)
       
@@ -544,12 +600,12 @@ methodsServer <- function(id, df, choices) {
         output$heatmap2 <- renderPlot({
           
           # Calculate intercepts for gridlines
-          x_grid <- isolate(df_plot()) %>% # 
+          x_grid <- isolate(df_plot()) %>% 
             {levels(.$Method)} %>% 
             length() %>% 
             {seq(0.5, . + 0.5, 1)}
           
-          y_grid <- isolate(df_plot()) %>% # 
+          y_grid <- isolate(df_plot()) %>% 
             select(`Gene, UniProt ID, Species`) %>% # target in df_mod_sub
             unique() %>% 
             nrow() %>% 
@@ -557,34 +613,34 @@ methodsServer <- function(id, df, choices) {
           
           # Generate plot
           patchwork::wrap_elements(ggplot(data = isolate(df_plot()),
-                      mapping = aes(x = Method,
-                                    y = `Gene, UniProt ID, Species`)) +
-            geom_vline(xintercept=x_grid, colour='white') +
-            geom_hline(yintercept=y_grid, colour='white') +
-            geom_tile(aes(fill = curation_ann),
-                      color = "white",
-                      lwd = 1,
-                      linetype = 1, 
-                      show.legend = input$incl_curation) +
-            geom_text(aes(label = quantification_label), 
-                      color = "white", 
-                      vjust = 0.77,
-                      size = text_size()) +
-            coord_fixed() +
-            scale_x_discrete(expand = c(0, 0), 
-                             drop = FALSE,
-                             sec.axis = dup_axis(), 
-                             name = NULL) +
-            scale_y_discrete(expand = c(0, 0), sec.axis = dup_axis()) +
-            scale_fill_manual(values = c(rev(viridis(3)), "#A7C947") %>% 
-                                `names<-`(c("AI", "Company", "Manual", "not_used")), 
-                              name = "Gene-Uniprot curation") +
-            theme(legend.position = "left",
-                  legend.justification = "top",
-                  axis.text.x.top = element_text(angle = 90, hjust = 0, vjust = 0.5), 
-                  axis.text.x.bottom = element_text(angle = 90, hjust = 1, vjust = 0.5), 
-                  text = element_text(size = text_size()),
-                  panel.grid = element_blank()))
+                                          mapping = aes(x = Method,
+                                                        y = `Gene, UniProt ID, Species`)) +
+                                     geom_vline(xintercept=x_grid, colour='white') +
+                                     geom_hline(yintercept=y_grid, colour='white') +
+                                     geom_tile(aes(fill = curation_ann),
+                                               color = "white",
+                                               lwd = 1,
+                                               linetype = 1, 
+                                               show.legend = input$incl_curation) +
+                                     geom_text(aes(label = quantification_label), 
+                                               color = "white", 
+                                               vjust = 0.77,
+                                               size = text_size()) +
+                                     coord_fixed() +
+                                     scale_x_discrete(expand = c(0, 0), 
+                                                      drop = FALSE,
+                                                      sec.axis = dup_axis(), 
+                                                      name = NULL) +
+                                     scale_y_discrete(expand = c(0, 0), sec.axis = dup_axis()) +
+                                     scale_fill_manual(values = c(rev(viridis(3)), "#A7C947") %>% 
+                                                         `names<-`(c("AI", "Company", "Manual", "not_used")), 
+                                                       name = "Gene-Uniprot curation") +
+                                     theme(legend.position = "left",
+                                           legend.justification = "top",
+                                           axis.text.x.top = element_text(angle = 90, hjust = 0, vjust = 0.5), 
+                                           axis.text.x.bottom = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+                                           text = element_text(size = text_size()),
+                                           panel.grid = element_blank()))
         }) 
         
         ## height ####
@@ -592,7 +648,7 @@ methodsServer <- function(id, df, choices) {
         height_string <- reactive({
           
           height_output <- n_rows() %>%
-            {(. * 5) + 1000}
+            {(. * 4) + 1000}
           
           tmp_string <- height_output %>%
             paste0(., "px")
@@ -604,20 +660,28 @@ methodsServer <- function(id, df, choices) {
         plotOutput(ns('heatmap2'),
                    width = "100%", 
                    height = height_string())
-      })
-
+        
+      }) %>% # end output heatmap
+        bindEvent(input$generate, 
+                  input$incl_panel, 
+                  input$excl_empty, 
+                  input$incl_curation,
+                  ignoreNULL = FALSE,
+                  ignoreInit = TRUE)
+      
       # Coverage table ####
       
       ## Create table ####
       coverage_table <- reactive({
         
-        n_target <- df_mod_sub() %>% 
-          pull(target) %>% 
+        n_target <- df_plot() %>% 
+          pull(`Gene, UniProt ID, Species`) %>% 
           unique() %>% 
           length()
         
-        tmp_table <- df_mod_sub() %>% 
-          count(technique_panel) %>% 
+        tmp_table <- df_plot() %>% 
+          count(technique_panel, 
+                .drop = FALSE) %>% 
           rename("Technique: Panel" = technique_panel) %>% 
           mutate(Targets = paste0(n, " / ", n_target),
                  "Coverage [%]" = round(n/n_target*100, 1)) %>% 
@@ -625,7 +689,10 @@ methodsServer <- function(id, df, choices) {
         
         return(tmp_table)
       }) %>% # end reactive coverage_table
-        bindEvent(input$generate, input$incl_panel, input$incl_curation,
+        bindEvent(input$generate, 
+                  input$incl_panel, 
+                  input$excl_empty, 
+                  input$incl_curation,
                   ignoreNULL = FALSE,
                   ignoreInit = FALSE)
       
@@ -636,7 +703,8 @@ methodsServer <- function(id, df, choices) {
                                           options = list(
                                             paging = TRUE,
                                             scrollX = TRUE,
-                                            pageLength = 50))
+                                            pageLength = 50,
+                                            layout = list(topStart = "info")))
       })
       
       # Export ####
@@ -644,23 +712,28 @@ methodsServer <- function(id, df, choices) {
       ## Create table ####
       export_table <- reactive({
         
-        tmp_table <- df_mod_sub() %>%
+        tmp_table <- df_plot() %>% # df_mod_sub
           mutate(quant_short = str_extract(quantification, "^.{3}")) %>% # extract "Abs" or "Rel" for shorter values in export table
-          select(target, technique_axis, quant_short) %>% 
+          select(`Gene, UniProt ID, Species`, Method, quant_short) %>% 
           unique() %>% 
-          arrange(technique_axis) %>% 
-          pivot_wider(names_from = technique_axis,
+          arrange(Method) %>% 
+          pivot_wider(names_from = Method,
                       values_from = quant_short,
                       values_fill = list("No"),
                       values_fn = list) %>%
           reframe(across(where(is.list), unlist),
                   .by = !where(is.list)) %>% 
-          separate_wider_delim(target, 
+          split(.$`Gene, UniProt ID, Species`) %>% 
+          lapply(function(y) y %>% 
+                   mutate(across(-matches("UniProt"), ~ unique(.x) %>% 
+                                   sort() %>% 
+                                   paste0(collapse = "/"))) %>% unique()) %>% 
+          do.call(bind_rows, .) %>% 
+          separate_wider_delim(`Gene, UniProt ID, Species`, 
                                delim = ", ",
                                names = c("Gene", "UniProt ID", "Species")) %>% 
           add_count(`UniProt ID`, name = "N same ID") %>% 
-          relocate(`N same ID`, .after = Species) %>% 
-          select_if(function(x){!all(x == "No")})
+          relocate(`N same ID`, .after = Species)
         
         if(!is.null(rv$import_table)){  
           tmp_table <- rv$import_table %>% 
@@ -673,14 +746,16 @@ methodsServer <- function(id, df, choices) {
         
         return(tmp_table)
       }) %>% # end reactive export_table
-        bindEvent(input$generate, input$incl_panel,
+        bindEvent(input$generate, 
+                  input$incl_panel,
+                  input$excl_empty, 
                   ignoreNULL = FALSE,
                   ignoreInit = FALSE)
       
       ## Export table ####
       output$export <- downloadHandler(
         filename = function() {
-
+          
           paste0(ifelse(!is.null(input$import),
                         input$import$name %>% 
                           str_remove(paste0("\\.", 

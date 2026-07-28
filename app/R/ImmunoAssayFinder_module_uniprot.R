@@ -31,10 +31,7 @@ uniprotUI <- function(id, up_path, ec_path) {
                tags$br(),
                # Note on inclusion-text:
                "Please note that this search function only covers proteins 
-                      that are included in at least one method under the Methods-tab. 
-                      However, if your target of interest is not listed here you may 
-                      still contact us to discuss if there may be another method 
-                      on the market or if we can develop an assay.")),
+                      that are included in at least one method under the Methods-tab.")),
       
       # Search input ####
       sidebar = sidebar(
@@ -159,8 +156,9 @@ uniprotUI <- function(id, up_path, ec_path) {
         input_switch(id = ns("strict_search"), 
                      label = "Strict search",
                      value = FALSE),
-        helpText("The combination of at least one entry per used search field will have to match in each result entry."),
-      
+        helpText("The combination of at least one entry per used search field will have to match in each result entry.",
+                 tags$hr()),
+        
         ## Search ####
         # action button to render results table
         actionButton(inputId = ns("search"), 
@@ -189,10 +187,10 @@ uniprotUI <- function(id, up_path, ec_path) {
       fluidRow(
         column(width = 10,
                div(verbatimTextOutput(ns("uniprotids")))),
-
+        
         column(width = 2,
                div(uiOutput(ns("copy_uniprot"))))
-        ),
+      ),
       
       column(width = 12,
              div(DTOutput(ns("table_uniprot")),
@@ -264,7 +262,7 @@ uniprotServer <- function(id, uniprot_db, search_list) {
             str_replace_all("\\]", "\\\\]") %>% 
             str_replace_all("\\.", "\\\\.") %>% 
             str_replace_all("\\-", "\\\\-")
-        
+          
           ## extract rows matching the regex and selected columns for table to show
           # tmp_results <- 
           tmp_data %>% 
@@ -295,18 +293,18 @@ uniprotServer <- function(id, uniprot_db, search_list) {
             {filter(uniprot_db, entry %in% .$entry)}
           
           results_names_prot <- extract_ids(input_id = "search_alt",
-                                      colname = "protein_names")
+                                            colname = "protein_names")
           
           results_names <- bind_rows(results_names_alt, 
                                      results_names_prot) %>% 
             unique()
-            
-            rm(results_names_alt, results_names_prot)
+          
+          rm(results_names_alt, results_names_prot)
         }
         
         ### on enzyme numbers  ####
         results_enz <- extract_ids(input_id = "search_enz", 
-                                    colname = "protein_names")
+                                   colname = "protein_names")
         
         ### on goterms ####
         results_goterm <- extract_ids(input_id = "search_goterm", 
@@ -314,15 +312,15 @@ uniprotServer <- function(id, uniprot_db, search_list) {
         
         ### on goterms bio ####
         results_goterm_bio <- extract_ids(input_id = "search_goterm_bio", 
-                                      colname = "gene_ontology_biological_process")
+                                          colname = "gene_ontology_biological_process")
         
         ### on goterms mol ####
         results_goterm_mol <- extract_ids(input_id = "search_goterm_mol", 
-                                      colname = "gene_ontology_molecular_function")
+                                          colname = "gene_ontology_molecular_function")
         
         ### on goterms cell ####
         results_goterm_cell <- extract_ids(input_id = "search_goterm_cell", 
-                                      colname = "gene_ontology_cellular_component")
+                                           colname = "gene_ontology_cellular_component")
         
         ### on goid ####
         results_goid <- extract_ids(input_id = "search_goid", 
@@ -357,7 +355,7 @@ uniprotServer <- function(id, uniprot_db, search_list) {
         
         ### on subcellular ####
         results_subcellar <- extract_ids(input_id = "search_subcell",
-                                        colname = "subcellular_location_cc")
+                                         colname = "subcellular_location_cc")
         
         if(!is.null(input$search_subcell)){
           ## create regular expression based on search entries
@@ -399,7 +397,7 @@ uniprotServer <- function(id, uniprot_db, search_list) {
           pull(query) %>% 
           unique() %>% 
           length()
-          
+        
         ## filter out only results in all queries (if switch is TRUE)
         if(input$strict_search){
           results_table <- results_table_org %>% 
