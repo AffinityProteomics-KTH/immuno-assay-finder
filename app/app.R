@@ -38,6 +38,8 @@ uniprot_path <- list.files(pattern = "uniprot_ext", recursive = TRUE) %>%
 ## Read file
 uniprot_database_org <- read_csv(uniprot_path)
 
+uniprot_database <- uniprot_database_org
+
 # #-------------    Load data (exocarta)    -----------------
 ### Find paths to ExoCarta files
 exocarta_path <- list.files(pattern = "ExoCarta", recursive = TRUE)
@@ -46,7 +48,7 @@ exocarta_path <- list.files(pattern = "ExoCarta", recursive = TRUE)
 exocarta_database_org <- read_delim(exocarta_path) %>% 
   clean_names()
 
-## Curate ExoCarta-tables
+## Curate ExoCarta-table
 exocarta_database <- exocarta_database_org %>%
   filter(content_type == "protein") %>% 
   select(gene_symbol, species) %>% 
@@ -55,7 +57,7 @@ exocarta_database <- exocarta_database_org %>%
   rename(gene_names_primary = gene_symbol)
 
 ## Add ExoCarta to Uniprot-table
-uniprot_database <- uniprot_database_org %>% 
+uniprot_database <- uniprot_database %>% 
   mutate(species = str_extract(organism, "^.+?(?=\\s\\()")) %>% 
   left_join(exocarta_database,
             by = join_by(species, gene_names_primary)) %>% 
@@ -348,7 +350,7 @@ ui <- page_fluid(
                           "SciLifeLab - ImmunoAssayFinder"),
              tags$head(tags$link(rel = "icon", 
                                  type = "image/png", 
-                                 href = "favicon.png"),
+                                 href = "favicon.png"), # not currently compatible with server
                        tags$title("ImmunoAssayFinder"))),
   
   navset_underline(
