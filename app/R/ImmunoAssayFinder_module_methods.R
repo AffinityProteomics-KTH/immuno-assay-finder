@@ -52,13 +52,19 @@ methodsUI <- function(id, choices) {
           ## Search ####
           accordion_panel(
             # Text above text search
-            title = "Gene name (HGNC) and/or UniProt ID search:", 
+            title = HTML(paste0("Gene name (", tag("em", "e.g."), 
+                                "HGNC) and/or UniProt ID search:")), 
             icon = bsicons::bs_icon("search"),
             helpText("Separate entries with ; (no surrounding spaces) 
-            or write as a regular expression 
-                   (not case sensitive)."),
-            helpText("To be specific in your search, preceed the Gene/ID with ^, 
-                     and end it with [$:] (regular expression syntax), e.g. '^MAPT[$:]'."),
+            or write as a ",
+                     tags$a("regular expression pattern",
+                            target = "_blank",
+                            href = "https://en.wikipedia.org/wiki/Regular_expression"), 
+                     " (not case sensitive)."),
+            helpText("To be specific in your search, use regular expression syntax: 
+            preceed the Gene/ID with ^, 
+                     and end it with ($|:), ", tags$em("e.g."), " '^MAPT($|:)', 
+                     and separate each such entry with |."),
             helpText("If you can't find your target of interest, 
                      double check under the UniProt IDs-tab that you are using 
                      the correct Gene name or UniProt ID in your search."),
@@ -68,6 +74,8 @@ methodsUI <- function(id, choices) {
                       label = NULL, 
                       value = "")
           ), # end search accordion
+          
+      
           
           # Filtering menu
           accordion_panel(
@@ -157,7 +165,7 @@ methodsUI <- function(id, choices) {
                      icon = icon("play",
                                  lib = "glyphicon"),
                      class = "btn-success",
-                     style = "color: #000000; background-color: #A7C947; border_color: #A7C947"), 
+                     style = "color: #000000; background-color: #A7C947; border_color: #A7C947"),
         
         ## Reset ####
         # action button to reset filtering (to not have to untick everything)
@@ -194,6 +202,10 @@ methodsUI <- function(id, choices) {
         input_switch(id = ns("incl_curation"), 
                      label = "Include curation annotation",
                      value = TRUE),
+        helpText("The mapping to UniProt ID and/or Gene name was either 
+                  provided by the respective companies or done manually by the 
+                  unit. AI was sometimes used as an aid, however, if the results 
+                 have been curated manually they are stated as such here."),
         
         ## Dark mode ####
         ## switch for if dark mode should be active or not
@@ -220,12 +232,16 @@ methodsUI <- function(id, choices) {
                         a new assay ourselves for you."),
                  tags$p("Assays with absolute quantification are marked with an asterisk (*).",
                         tags$br(),
-                        "Gene names followed by a colon (:) signifies that a specific form is targeted.")),
-      
+                        "Gene names followed by a colon (:) signifies that a specific form is targeted."),
+                 tags$p("If you get an error below this paragraph when pressing Generate ('Error: 
+                        An error has occurred.'), the heatmap is too big to display. 
+                        Try zooming out in the browser window, use a bigger screen 
+                        or increase the resolution.")),
+        
         ## Plot area ####
         column(width = 8,
-               (div(style='width:100%;overflow-x: scroll;overflow-y: scroll;', 
-                    uiOutput(ns("heatmap")))) ), 
+               (div(style='width:100%;overflow-x: scroll;overflow-y: scroll;',
+                    uiOutput(ns("heatmap")))) ),
         
         ## Coverage table ####
         column(width = 4,
@@ -338,6 +354,10 @@ methodsServer <- function(id, df, choices) {
                                       unlist() %>% 
                                       str_split("[;, ]") %>% 
                                       unlist()))
+          
+          # Check if there are any targets left after subsetting
+          validate(need(nrow(tmp_data) > 0, 
+                        "No results with current filtering."))
         }
         
         ## subset on genes/uniprot ids ####
@@ -350,12 +370,20 @@ methodsServer <- function(id, df, choices) {
           tmp_data <- tmp_data %>%
             filter(str_detect(gene, regex(filter_string, ignore_case = T)) |
                      str_detect(uniprot_id, regex(filter_string, ignore_case = T)))
+          
+          # Check if there are any targets left after subsetting
+          validate(need(nrow(tmp_data) > 0, 
+                        "No results with current filtering. Make sure you use concencus gene symbols or UniProt accession numbers. If unsure, see the tab 'UniProt IDs'."))
         }
         
         ## subset on species ####
         if(!is.null(input$filter_spec)){
           tmp_data <- tmp_data %>% 
             filter(species %in% input$filter_spec)
+          
+          # Check if there are any targets left after subsetting
+          validate(need(nrow(tmp_data) > 0, 
+                        "No results with current filtering."))
         }
         
         ## Subset on panel ####
@@ -364,6 +392,10 @@ methodsServer <- function(id, df, choices) {
             filter(panel %in% input$filter_panel) %>% 
             mutate(technique_axis = factor(technique_axis,
                                            levels = unique(technique_axis)))
+          
+          # Check if there are any targets left after subsetting
+          validate(need(nrow(tmp_data) > 0, 
+                        "No results with current filtering."))
         }
         
         ## Subset on tech ####
@@ -372,24 +404,35 @@ methodsServer <- function(id, df, choices) {
             filter(technique %in% input$filter_tech) %>% 
             mutate(technique_axis = factor(technique_axis,
                                            levels = unique(technique_axis)))
+          
+          # Check if there are any targets left after subsetting
+          validate(need(nrow(tmp_data) > 0, 
+                        "No results with current filtering."))
         }
         
         ## Subset on curation ####
         if(!is.null(input$filter_cura)){
           tmp_data <- tmp_data %>% 
             filter(uniprot_source %in% input$filter_cura)
+          
+          # Check if there are any targets left after subsetting
+          validate(need(nrow(tmp_data) > 0, 
+                        "No results with current filtering."))
         }
         
         ## Subset on quantification ####
         if(!is.null(input$filter_quant)){
           tmp_data <- tmp_data %>% 
             filter(quantification %in% input$filter_quant)
+          
+          # Check if there are any targets left after subsetting
+          validate(need(nrow(tmp_data) > 0, 
+                        "No results with current filtering."))
         }
         
         # Check if there are any targets left after subsetting
-        if(nrow(tmp_data) == 0){
-          stop("No results with current filtering.")
-        }
+        validate(need(nrow(tmp_data) > 0, 
+                      "No results with current filtering."))
         
         ## sort ####
         ## Sort subsetted table based on sorting input
@@ -411,6 +454,9 @@ methodsServer <- function(id, df, choices) {
       
       ## species ####
       observe({
+        # validate(need(nrow(df_mod_sub()) > 0, 
+        #               "No results with current filtering."))
+        
         updated_choices$species_choices <- df_mod_sub() %>%
           pull(species) %>%
           unique() %>%
@@ -435,7 +481,7 @@ methodsServer <- function(id, df, choices) {
           pull(panel) %>%
           unique() %>%
           sort()
-        
+
         updateCheckboxGroupInput(session,
                                  inputId = "filter_panel",
                                  choices = updated_choices$panels_choices,
@@ -455,7 +501,7 @@ methodsServer <- function(id, df, choices) {
           pull(technique) %>%
           unique() %>%
           sort()
-        
+
         updateCheckboxGroupInput(session,
                                  inputId = "filter_tech",
                                  choices = updated_choices$techs_choices,
@@ -546,7 +592,7 @@ methodsServer <- function(id, df, choices) {
             rename("Method" = technique_axis,
                    "Gene, UniProt ID, Species" = target)
         }
-        
+
         return(tmp_data)
         
       }) %>% # end reactive df_plot
@@ -600,12 +646,12 @@ methodsServer <- function(id, df, choices) {
         output$heatmap2 <- renderPlot({
           
           # Calculate intercepts for gridlines
-          x_grid <- isolate(df_plot()) %>% 
+          x_grid <- isolate(df_plot()) %>% # 
             {levels(.$Method)} %>% 
             length() %>% 
             {seq(0.5, . + 0.5, 1)}
           
-          y_grid <- isolate(df_plot()) %>% 
+          y_grid <- isolate(df_plot()) %>% # 
             select(`Gene, UniProt ID, Species`) %>% # target in df_mod_sub
             unique() %>% 
             nrow() %>% 
@@ -675,11 +721,11 @@ methodsServer <- function(id, df, choices) {
       coverage_table <- reactive({
         
         n_target <- df_plot() %>% 
-          pull(`Gene, UniProt ID, Species`) %>% 
+          pull(`Gene, UniProt ID, Species`) %>%
           unique() %>% 
           length()
         
-        tmp_table <- df_plot() %>% 
+        tmp_table <- df_plot() %>%
           count(technique_panel, 
                 .drop = FALSE) %>% 
           rename("Technique: Panel" = technique_panel) %>% 
