@@ -143,7 +143,7 @@ refsUI <- function(id) {
     
     fluidRow(tags$p("Author: Ceke Hellström",
                     tags$br(),
-                    "Version: 1.0.0",
+                    "Version: 1.1.0",
                     tags$br(),
                     "Owner: ",
                     tags$a("Affinity Proteomics, SciLifeLab",
